@@ -47,27 +47,30 @@ export default function TransactionTable({ transactions, onCategoryChange }: Pro
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-100">
-            {[
-              { label: t(language, "date"),       cls: "" },
-              { label: t(language, "description"), cls: "" },
-              { label: t(language, "amount"),      cls: "" },
-              { label: t(language, "category"),    cls: "min-w-[120px]" },
-              { label: t(language, "confidence"),  cls: "" },
-              { label: t(language, "action"),      cls: "" },
-            ].map(({ label, cls }) => (
-              <th
-                key={label}
-                className={`text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wide ${cls}`}
-              >
-                {label}
-              </th>
-            ))}
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wide">
+              {t(language, "date")}
+            </th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wide">
+              {t(language, "description")}
+            </th>
+            <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wide">
+              {t(language, "amount")}
+            </th>
+            {/* hidden on mobile */}
+            <th className="hidden sm:table-cell text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wide min-w-[120px]">
+              {t(language, "category")}
+            </th>
+            <th className="hidden sm:table-cell text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wide">
+              {t(language, "confidence")}
+            </th>
+            <th className="hidden sm:table-cell text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wide">
+              {t(language, "action")}
+            </th>
           </tr>
         </thead>
         <tbody>
           {transactions.map((tx) => {
-            const isLowConfidence =
-              tx.confidence !== null && tx.confidence < 0.75;
+            const isLowConfidence = tx.confidence !== null && tx.confidence < 0.75;
             const isIncome = INCOME_CATEGORIES.has(tx.category ?? "");
             const categoryLabel =
               language === "zh" && tx.category_zh
@@ -81,47 +84,56 @@ export default function TransactionTable({ transactions, onCategoryChange }: Pro
                   isLowConfidence ? "bg-amber-50/50" : ""
                 }`}
               >
-                <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                {/* Date */}
+                <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs sm:text-sm">
                   {tx.date}
                 </td>
-                <td className="px-4 py-3 max-w-xs">
-                  <div className="flex items-center gap-1.5">
+
+                {/* Description — shows category badge below on mobile */}
+                <td className="px-4 py-3 max-w-[140px] sm:max-w-xs">
+                  <div className="flex items-start gap-1.5">
                     {isLowConfidence && (
                       <AlertTriangle
                         size={13}
-                        className="text-amber-400 flex-shrink-0"
+                        className="text-amber-400 flex-shrink-0 mt-0.5"
                         aria-label={t(language, "lowConfidence")}
                       />
                     )}
-                    <span className="truncate text-gray-700">
-                      {tx.description}
-                    </span>
+                    <div className="min-w-0">
+                      <span className="truncate text-gray-700 block">{tx.description}</span>
+                      {/* Category shown inline on mobile only */}
+                      {tx.category && (
+                        <span className="sm:hidden mt-1 block">
+                          <CategoryBadge category={tx.category} label={categoryLabel} />
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </td>
-                <td
-                  className={`px-4 py-3 font-medium tabular-nums whitespace-nowrap ${
-                    isIncome ? "text-emerald-600" : "text-red-500"
-                  }`}
-                >
-                  {isIncome ? "+" : "-"}
-                  {formatAmount(Math.abs(tx.amount), currency)}
+
+                {/* Amount */}
+                <td className={`px-4 py-3 font-medium tabular-nums whitespace-nowrap text-xs sm:text-sm ${
+                  isIncome ? "text-emerald-600" : "text-red-500"
+                }`}>
+                  {isIncome ? "+" : "-"}{formatAmount(Math.abs(tx.amount), currency)}
                 </td>
-                <td className="px-4 py-3 min-w-[120px]">
+
+                {/* Category — desktop only */}
+                <td className="hidden sm:table-cell px-4 py-3 min-w-[120px]">
                   {tx.category ? (
-                    <CategoryBadge
-                      category={tx.category}
-                      label={categoryLabel}
-                    />
+                    <CategoryBadge category={tx.category} label={categoryLabel} />
                   ) : (
                     <span className="text-gray-300">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-gray-500">
-                  {tx.confidence !== null
-                    ? `${Math.round(tx.confidence * 100)}%`
-                    : "—"}
+
+                {/* Confidence — desktop only */}
+                <td className="hidden sm:table-cell px-4 py-3 text-gray-500">
+                  {tx.confidence !== null ? `${Math.round(tx.confidence * 100)}%` : "—"}
                 </td>
-                <td className="px-4 py-3">
+
+                {/* Action — desktop only */}
+                <td className="hidden sm:table-cell px-4 py-3">
                   <select
                     className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-[#1D9E75] disabled:opacity-50"
                     value={tx.category ?? ""}
@@ -129,14 +141,10 @@ export default function TransactionTable({ transactions, onCategoryChange }: Pro
                     onChange={(e) => handleCategoryChange(tx.id, e.target.value)}
                     title={t(language, "overrideCategory")}
                   >
-                    <option value="" disabled>
-                      {t(language, "overrideCategory")}
-                    </option>
+                    <option value="" disabled>{t(language, "overrideCategory")}</option>
                     {CATEGORIES_EN.map((cat) => (
                       <option key={cat} value={cat}>
-                        {language === "zh"
-                          ? `${CATEGORY_ZH_MAP[cat]} / ${cat}`
-                          : cat}
+                        {language === "zh" ? `${CATEGORY_ZH_MAP[cat]} / ${cat}` : cat}
                       </option>
                     ))}
                   </select>

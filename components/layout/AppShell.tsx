@@ -107,7 +107,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="hidden md:block" />
 
           {/* Right controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col xs:flex-row items-end xs:items-center gap-1.5">
             {/* Language toggle — mobile only */}
             <div className="flex md:hidden items-center gap-1 bg-gray-100 rounded-lg p-0.5">
               {(["en", "zh"] as const).map((lang) => (

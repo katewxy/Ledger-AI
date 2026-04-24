@@ -28,7 +28,7 @@ export default function MetricCard({
         <span className="text-sm text-gray-500">{label}</span>
         {icon && <span className="text-gray-300">{icon}</span>}
       </div>
-      <p className={`text-2xl font-semibold ${colorMap[color]}`}>{value}</p>
+      <p className={`text-xl sm:text-2xl font-semibold break-all ${colorMap[color]}`}>{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
     </div>
   );
