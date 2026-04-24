@@ -125,13 +125,12 @@ export default function UploadPage() {
         rows: parsed.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE),
       }));
 
-      // Run batches with max 3 in-flight at once to avoid API rate limits
-      const CONCURRENCY = 3;
-      const orderedResults: ClassifyResult[][] = new Array(totalBatches);
+      // Process batches sequentially with a delay to avoid API rate limits
+      for (let i = 0; i < batches.length; i++) {
+        const { index, rows } = batches[i];
+        if (i > 0) await new Promise((r) => setTimeout(r, 500));
 
-      async function runBatch({ index, rows }: { index: number; rows: ParsedRow[] }) {
         const descriptions = rows.map((r) => r.description);
-
         const res = await fetch("/api/classify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -144,7 +143,6 @@ export default function UploadPage() {
         }
 
         const { results } = (await res.json()) as { results: ClassifyResult[] };
-        orderedResults[index] = results;
 
         const txRows = rows.map((row, j) => {
           const result = results[j] ?? { category_en: "Other Expense", category_zh: "其他支出", confidence: 0.5 };
@@ -165,15 +163,6 @@ export default function UploadPage() {
         completedBatches += 1;
         setProgress(Math.round((completedBatches / totalBatches) * 100));
       }
-
-      const queue = [...batches];
-      async function worker() {
-        while (queue.length > 0) {
-          const batch = queue.shift()!;
-          await runBatch(batch);
-        }
-      }
-      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, batches.length) }, worker));
 
       // Mark upload done
       if (uploadId) {
