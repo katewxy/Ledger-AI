@@ -125,51 +125,55 @@ export default function UploadPage() {
         rows: parsed.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE),
       }));
 
-      // Run all batches in parallel; each updates progress as it finishes
+      // Run batches with max 3 in-flight at once to avoid API rate limits
+      const CONCURRENCY = 3;
       const orderedResults: ClassifyResult[][] = new Array(totalBatches);
 
-      await Promise.all(
-        batches.map(async ({ index, rows }) => {
-          const descriptions = rows.map((r) => r.description);
+      async function runBatch({ index, rows }: { index: number; rows: ParsedRow[] }) {
+        const descriptions = rows.map((r) => r.description);
 
-          const res = await fetch("/api/classify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ descriptions, currency: fileCurrency }),
-          });
+        const res = await fetch("/api/classify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ descriptions, currency: fileCurrency }),
+        });
 
-          if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`Batch ${index + 1} failed: ${text}`);
-          }
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Batch ${index + 1} failed: ${text}`);
+        }
 
-          const { results } = (await res.json()) as { results: ClassifyResult[] };
+        const { results } = (await res.json()) as { results: ClassifyResult[] };
+        orderedResults[index] = results;
 
-          // Store results in original order so inserts are correct
-          orderedResults[index] = results;
+        const txRows = rows.map((row, j) => {
+          const result = results[j] ?? { category_en: "Other Expense", category_zh: "其他支出", confidence: 0.5 };
+          return {
+            upload_id: uploadId,
+            date: row.date,
+            description: row.description,
+            amount: row.amount,
+            currency: fileCurrency,
+            category: result.category_en,
+            category_zh: result.category_zh || CATEGORY_ZH_MAP[result.category_en] || result.category_en,
+            confidence: result.confidence,
+            source: "csv",
+          };
+        });
+        await supabase.from("transactions").insert(txRows);
 
-          // Insert this batch into Supabase immediately
-          const txRows = rows.map((row, j) => {
-            const result = results[j] ?? { category_en: "Other Expense", category_zh: "其他支出", confidence: 0.5 };
-            return {
-              upload_id: uploadId,
-              date: row.date,
-              description: row.description,
-              amount: row.amount,
-              currency: fileCurrency,
-              category: result.category_en,
-              category_zh: result.category_zh || CATEGORY_ZH_MAP[result.category_en] || result.category_en,
-              confidence: result.confidence,
-              source: "csv",
-            };
-          });
-          await supabase.from("transactions").insert(txRows);
+        completedBatches += 1;
+        setProgress(Math.round((completedBatches / totalBatches) * 100));
+      }
 
-          // Increment progress as each batch finishes
-          completedBatches += 1;
-          setProgress(Math.round((completedBatches / totalBatches) * 100));
-        })
-      );
+      const queue = [...batches];
+      async function worker() {
+        while (queue.length > 0) {
+          const batch = queue.shift()!;
+          await runBatch(batch);
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, batches.length) }, worker));
 
       // Mark upload done
       if (uploadId) {
