@@ -244,47 +244,32 @@ export default function DashboardPage() {
         ) : !insights.hasData ? (
           <p className="text-sm text-gray-400">{t(language, "noInsights")}</p>
         ) : (
-          <ul className="space-y-2.5">
-            {/* Top spending category */}
-            <li className="text-sm text-gray-600 flex items-start gap-2">
-              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#1D9E75] flex-shrink-0" />
-              <span className="leading-relaxed">
-                {language === "zh" ? (
-                  <><span className="font-medium text-gray-900">{CATEGORY_ZH_MAP[insights.topCategory] ?? insights.topCategory}</span>是支出最大的分类，共计<span className="font-medium text-gray-900">{formatAmount(insights.topAmount, currency)}</span>，占总支出的 {insights.topPct}%。</>
-                ) : (
-                  <><span className="font-medium text-gray-900">{insights.topCategory}</span> is your largest expense category at <span className="font-medium text-gray-900">{formatAmount(insights.topAmount, currency)}</span> ({insights.topPct}% of total expenses).</>
-                )}
-              </span>
-            </li>
+          <div className="space-y-2.5">
+            <p className="text-sm text-gray-600 leading-relaxed">
+              <span className="inline-block w-2 h-2 rounded-full bg-[#1D9E75] mr-2 align-middle" />
+              {language === "zh"
+                ? `${CATEGORY_ZH_MAP[insights.topCategory] ?? insights.topCategory}是支出最大的分类，共计${formatAmount(insights.topAmount, currency)}，占总支出的${insights.topPct}%。`
+                : `${insights.topCategory} is your largest expense category at ${formatAmount(insights.topAmount, currency)}, accounting for ${insights.topPct}% of total expenses.`}
+            </p>
 
-            {/* Expense / income ratio */}
             {insights.expenseRatio > 0 && (
-              <li className="text-sm text-gray-600 flex items-start gap-2">
-                <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${insights.expenseRatio > 90 ? "bg-red-400" : insights.expenseRatio > 70 ? "bg-amber-400" : "bg-emerald-400"}`} />
-                <span className="leading-relaxed">
-                  {language === "zh" ? (
-                    <>支出占收入的<span className="font-medium text-gray-900">{insights.expenseRatio}%</span>。{insights.expenseRatio > 90 ? "⚠️ 利润空间非常有限。" : insights.expenseRatio > 70 ? "利润率尚可，但仍需注意成本控制。" : "收支状况良好。"}</>
-                  ) : (
-                    <>Expenses are <span className="font-medium text-gray-900">{insights.expenseRatio}%</span> of total income. {insights.expenseRatio > 90 ? "⚠️ Margins are very tight — review your largest cost drivers." : insights.expenseRatio > 70 ? "Margins are healthy but watch for cost creep." : "Your business is retaining a strong portion of revenue."}</>
-                  )}
-                </span>
-              </li>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                <span className={`inline-block w-2 h-2 rounded-full mr-2 align-middle ${insights.expenseRatio > 90 ? "bg-red-400" : insights.expenseRatio > 70 ? "bg-amber-400" : "bg-emerald-400"}`} />
+                {language === "zh"
+                  ? `支出占收入的${insights.expenseRatio}%。${insights.expenseRatio > 90 ? "⚠️ 利润空间非常有限。" : insights.expenseRatio > 70 ? "利润率尚可，但仍需注意成本控制。" : "收支状况良好。"}`
+                  : `Expenses are ${insights.expenseRatio}% of total income. ${insights.expenseRatio > 90 ? "⚠️ Margins are very tight — review your largest cost drivers." : insights.expenseRatio > 70 ? "Margins are healthy but watch for cost creep." : "Your business is retaining a strong portion of revenue."}`}
+              </p>
             )}
 
-            {/* High-concentration flag */}
             {insights.highConcCategory && (
-              <li className="text-sm text-gray-600 flex items-start gap-2">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-                <span className="leading-relaxed">
-                  {language === "zh" ? (
-                    <>⚠️ <span className="font-medium text-gray-900">{CATEGORY_ZH_MAP[insights.highConcCategory] ?? insights.highConcCategory}</span>占总支出的 {insights.highConcPct}%，支出集中度较高，建议重点关注。</>
-                  ) : (
-                    <>⚠️ <span className="font-medium text-gray-900">{insights.highConcCategory}</span> accounts for {insights.highConcPct}% of expenses — unusually high concentration worth reviewing.</>
-                  )}
-                </span>
-              </li>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-2 align-middle" />
+                {language === "zh"
+                  ? `⚠️ ${CATEGORY_ZH_MAP[insights.highConcCategory] ?? insights.highConcCategory}占总支出的${insights.highConcPct}%，支出集中度较高，建议重点关注。`
+                  : `⚠️ ${insights.highConcCategory} accounts for ${insights.highConcPct}% of expenses — unusually high concentration worth reviewing.`}
+              </p>
             )}
-          </ul>
+          </div>
         )}
       </div>
 
