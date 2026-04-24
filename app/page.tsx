@@ -122,25 +122,14 @@ function InsightsList({ insights, language, currency }: {
       : `⚠️ ${highCatName} accounts for ${insights.highConcPct}% of expenses — unusually high concentration worth reviewing.`)
     : null;
 
-  const ratioColor = insights.expenseRatio > 90 ? "bg-red-400" : insights.expenseRatio > 70 ? "bg-amber-400" : "bg-emerald-400";
-
   return (
     <div className="space-y-3">
-      <p className="text-sm text-gray-700 leading-relaxed">
-        <span className="inline-block w-2 h-2 rounded-full bg-[#1D9E75] mr-2"></span>
-        {line1}
-      </p>
+      <p className="text-sm text-gray-700 leading-relaxed">{"• " + line1}</p>
       {insights.expenseRatio > 0 && (
-        <p className="text-sm text-gray-700 leading-relaxed">
-          <span className={`inline-block w-2 h-2 rounded-full mr-2 ${ratioColor}`}></span>
-          {line2}
-        </p>
+        <p className="text-sm text-gray-700 leading-relaxed">{"• " + line2}</p>
       )}
       {line3 && (
-        <p className="text-sm text-gray-700 leading-relaxed">
-          <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-2"></span>
-          {line3}
-        </p>
+        <p className="text-sm text-gray-700 leading-relaxed">{"• " + line3}</p>
       )}
     </div>
   );
