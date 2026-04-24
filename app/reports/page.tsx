@@ -295,7 +295,7 @@ export default function ReportsPage() {
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} tickFormatter={tickFmt} width={48} />
                   <Tooltip
-                    formatter={(v: number) => fmt(v)}
+                    formatter={(v) => fmt(Number(v))}
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #F3F4F6", boxShadow: "none" }}
                   />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
@@ -321,7 +321,7 @@ export default function ReportsPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(v: number) => fmt(v)}
+                      formatter={(v) => fmt(Number(v))}
                       contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #F3F4F6", boxShadow: "none" }}
                     />
                   </PieChart>

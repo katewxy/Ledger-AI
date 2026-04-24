@@ -90,7 +90,7 @@ export default function TransactionTable({ transactions, onCategoryChange }: Pro
                       <AlertTriangle
                         size={13}
                         className="text-amber-400 flex-shrink-0"
-                        title={t(language, "lowConfidence")}
+                        aria-label={t(language, "lowConfidence")}
                       />
                     )}
                     <span className="truncate text-gray-700">
