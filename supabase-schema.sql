@@ -60,3 +60,5 @@ BEGIN
   RETURN result;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION execute_read_query(text) TO anon, authenticated;
