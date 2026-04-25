@@ -74,6 +74,14 @@ export default function AiChat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  function handleInputFocus() {
+    // On mobile, the fixed bottom tab bar can cover the input when the keyboard opens.
+    // Wait for the keyboard animation then scroll the input into view.
+    setTimeout(() => {
+      inputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 350);
+  }
+
   async function handleSubmit(e: FormEvent | null, question?: string) {
     e?.preventDefault();
     const q = (question ?? input).trim();
@@ -206,6 +214,7 @@ export default function AiChat() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onFocus={handleInputFocus}
             placeholder={t(language, "chatPlaceholder")}
             disabled={loading}
             className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#1D9E75] disabled:bg-gray-50 disabled:text-gray-400 placeholder:text-gray-300"
