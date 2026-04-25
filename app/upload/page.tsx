@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Upload, Camera, CheckCircle, AlertCircle, FileText, X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { t } from "@/lib/i18n";
@@ -20,6 +21,7 @@ interface ReceiptData {
 
 export default function UploadPage() {
   const { language, currency: globalCurrency } = useApp();
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("file");
 
   // ── File upload state ──────────────────────────────────────────
@@ -171,6 +173,7 @@ export default function UploadPage() {
 
       setProgress(100);
       setClassifyDone(true);
+      setTimeout(() => router.push("/"), 1200);
     } catch (err) {
       setClassifyError(String(err));
     } finally {
