@@ -9,7 +9,7 @@ import { useApp } from "@/context/AppContext";
 import { t } from "@/lib/i18n";
 import { formatAmount } from "@/lib/formatCurrency";
 import { supabase } from "@/lib/supabase";
-import { INCOME_CATEGORIES, CATEGORY_ZH_MAP, type Transaction } from "@/types";
+import { INCOME_CATEGORIES, CATEGORY_ZH_MAP, type Transaction, type Currency } from "@/types";
 
 // ── Period selector ────────────────────────────────────────────────────────
 
@@ -96,30 +96,30 @@ function computeInsights(txs: Transaction[]): Insight {
 function InsightsList({ insights, language, currency }: {
   insights: Insight;
   language: "en" | "zh";
-  currency: string;
+  currency: Currency;
 }) {
-  const topCatName = language === "zh"
+  const zh = language === "zh";
+  const amt = (n: number) => formatAmount(n, currency);
+
+  const topName = zh
     ? (CATEGORY_ZH_MAP[insights.topCategory] ?? insights.topCategory)
     : insights.topCategory;
 
-  const line1 = language === "zh"
-    ? `${topCatName}是支出最大的分类，共计${formatAmount(insights.topAmount, currency as import("@/types").Currency)}，占总支出的${insights.topPct}%。`
-    : `${topCatName} is your largest expense category at ${formatAmount(insights.topAmount, currency as import("@/types").Currency)}, accounting for ${insights.topPct}% of total expenses.`;
+  const line1 = zh
+    ? `${topName}是支出最大的分类，共计${amt(insights.topAmount)}，占总支出的${insights.topPct}%。`
+    : `${topName} is your largest expense category at ${amt(insights.topAmount)}, accounting for ${insights.topPct}% of total expenses.`;
 
-  const ratioSuffix = language === "zh"
-    ? (insights.expenseRatio > 90 ? "⚠️ 利润空间非常有限。" : insights.expenseRatio > 70 ? "利润率尚可，但仍需注意成本控制。" : "收支状况良好。")
-    : (insights.expenseRatio > 90 ? "⚠️ Margins are very tight — review your largest cost drivers." : insights.expenseRatio > 70 ? "Margins are healthy but watch for cost creep." : "Your business is retaining a strong portion of revenue.");
-  const line2 = language === "zh"
-    ? `支出占收入的${insights.expenseRatio}%。${ratioSuffix}`
-    : `Expenses are ${insights.expenseRatio}% of total income. ${ratioSuffix}`;
+  const line2 = zh
+    ? `支出占收入的${insights.expenseRatio}%。${insights.expenseRatio > 90 ? "⚠️ 利润空间非常有限。" : insights.expenseRatio > 70 ? "利润率尚可，但仍需注意成本控制。" : "收支状况良好。"}`
+    : `Expenses are ${insights.expenseRatio}% of total income. ${insights.expenseRatio > 90 ? "⚠️ Margins are very tight — review your largest cost drivers." : insights.expenseRatio > 70 ? "Margins are healthy but watch for cost creep." : "Your business is retaining a strong portion of revenue."}`;
 
-  const highCatName = insights.highConcCategory
-    ? (language === "zh" ? (CATEGORY_ZH_MAP[insights.highConcCategory] ?? insights.highConcCategory) : insights.highConcCategory)
+  const highName = insights.highConcCategory
+    ? (zh ? (CATEGORY_ZH_MAP[insights.highConcCategory] ?? insights.highConcCategory) : insights.highConcCategory)
     : null;
-  const line3 = highCatName
-    ? (language === "zh"
-      ? `⚠️ ${highCatName}占总支出的${insights.highConcPct}%，支出集中度较高，建议重点关注。`
-      : `⚠️ ${highCatName} accounts for ${insights.highConcPct}% of expenses — unusually high concentration worth reviewing.`)
+  const line3 = highName
+    ? (zh
+      ? `⚠️ ${highName}占总支出的${insights.highConcPct}%，支出集中度较高，建议重点关注。`
+      : `⚠️ ${highName} accounts for ${insights.highConcPct}% of expenses — unusually high concentration worth reviewing.`)
     : null;
 
   return (

@@ -1,8 +1,11 @@
+
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import type { ClassifyResult } from "@/types";
+import { cleanDescription } from "./cleaner";
+import { MERCHANT_RULES } from "./merchants";
+import { getCached, setCached } from "./cache";
 
-// Allow up to 60s per request (one batch of 50)
 export const maxDuration = 60;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -14,6 +17,23 @@ Always return a JSON array with one object per transaction, in the same order as
 Use these Chinese mappings: Revenue/主营业务收入, IT Infrastructure/IT基础设施, Travel & Entertainment/差旅费, Rent & Utilities/租赁及水电, Marketing/营销推广, Office Supplies/办公耗材, Meals & Entertainment/餐饮招待, Payroll/人工成本, Taxes & Fees/税费, Other Expense/其他支出, Other Income/其他收入.
 
 Return only the raw JSON array. No markdown, no explanation, no other text.`;
+
+// ─── Rule-based 前置分类 ──────────────────────────────────────────
+function matchRule(description: string): ClassifyResult | null {
+  const cleaned = cleanDescription(description);
+  for (const rule of MERCHANT_RULES) {
+    for (const keyword of rule.keywords) {
+      if (cleaned.includes(keyword)) {
+        return {
+          category_en: rule.category_en,
+          category_zh: rule.category_zh,
+          confidence: 1.0,
+        };
+      }
+    }
+  }
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,102 +51,102 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No descriptions provided" }, { status: 400 });
     }
 
-    // API now handles exactly one batch of up to 50 — client is responsible for batching
     const batch = descriptions.slice(0, 50);
-    const numbered = batch.map((d, i) => `${i + 1}. ${d}`).join("\n");
-    const userPrompt = `Currency context: ${currency}\n\nTransactions to classify:\n${numbered}`;
+    const results: (ClassifyResult | null)[] = batch.map(() => null);
+    const needsLLM: { index: number; description: string }[] = [];
 
-    const batchStart = Date.now();
-    console.log(`[classify] Sending ${batch.length} descriptions to Claude at ${new Date().toISOString()}`);
+    // ─── Step 1: 查缓存 ──────────────────────────────────────
+    const cacheChecks = await Promise.all(
+      batch.map((desc) => getCached(desc))
+    );
 
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt }],
-    });
+    for (let i = 0; i < batch.length; i++) {
+      if (cacheChecks[i]) {
+        results[i] = cacheChecks[i];
+        continue;
+      }
 
-    console.log(`[classify] stop_reason: ${msg.stop_reason} — Claude took ${Date.now() - batchStart}ms`);
-
-    if (!msg.content || msg.content.length === 0) {
-      throw new Error("Claude returned empty content");
+      // ─── Step 2: 跑规则层 ──────────────────────────────────
+      const ruleResult = matchRule(batch[i]);
+      if (ruleResult) {
+        results[i] = ruleResult;
+        console.log(`[classify] Rule matched [${i}]: "${batch[i]}" → ${ruleResult.category_en}`);
+        await setCached(batch[i], ruleResult, "rule");
+      } else {
+        needsLLM.push({ index: i, description: batch[i] });
+      }
     }
 
-    const block = msg.content[0];
-    if (block.type !== "text") {
-      throw new Error(`Unexpected content block type: ${block.type}`);
-    }
+    console.log(`[classify] Cache+Rule: ${batch.length - needsLLM.length} resolved, ${needsLLM.length} sent to LLM`);
 
-    const raw = block.text.trim();
-    console.log(`[classify] Raw response (first 300 chars): ${raw.slice(0, 300)}`);
-
+    // ─── Step 3: 剩下的送给 LLM ──────────────────────────────
     const FALLBACK: ClassifyResult = { category_en: "Other Expense", category_zh: "其他支出", confidence: 0.5 };
 
-    // 1. Strip markdown code fences (``` or ```json)
-    const stripped = raw
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/, "")
-      .trim();
+    if (needsLLM.length > 0) {
+      const numbered = needsLLM.map((item, i) => `${i + 1}. ${item.description}`).join("\n");
+      const userPrompt = `Currency context: ${currency}\n\nTransactions to classify:\n${numbered}`;
 
-    // 2. Extract content between the FIRST '[' and the LAST ']' to avoid
-    //    trailing prose or extra characters causing "Unexpected non-whitespace"
-    const firstBracket = stripped.indexOf("[");
-    const lastBracket = stripped.lastIndexOf("]");
+      const batchStart = Date.now();
+      console.log(`[classify] Sending ${needsLLM.length} descriptions to Claude`);
 
-    if (firstBracket !== -1 && lastBracket > firstBracket) {
-      const arraySlice = stripped.slice(firstBracket, lastBracket + 1);
-
-      let parsed: unknown[];
-      try {
-        parsed = JSON.parse(arraySlice) as unknown[];
-      } catch (parseErr) {
-        console.error("[classify] JSON.parse failed on array slice:", parseErr);
-        console.error("[classify] Slice was:", arraySlice.slice(0, 500));
-        // Return all fallbacks rather than a 500 — caller gets usable data
-        const results = batch.map(() => FALLBACK);
-        return NextResponse.json({ results });
-      }
-
-      // Validate each element individually; replace any bad ones with the fallback
-      const results: ClassifyResult[] = parsed.map((item, i) => {
-        if (
-          item &&
-          typeof item === "object" &&
-          "category_en" in item &&
-          typeof (item as Record<string, unknown>).category_en === "string" &&
-          "confidence" in item &&
-          typeof (item as Record<string, unknown>).confidence === "number"
-        ) {
-          return item as ClassifyResult;
-        }
-        console.warn(`[classify] Item ${i} malformed, using fallback:`, item);
-        return FALLBACK;
+      const msg = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 2048,
+        system: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        messages: [{ role: "user", content: userPrompt }],
       });
 
-      // Pad with fallbacks if Claude returned fewer items than expected
-      while (results.length < batch.length) {
-        console.warn(`[classify] Missing result at index ${results.length}, padding with fallback`);
-        results.push(FALLBACK);
+      console.log(`[classify] Claude took ${Date.now() - batchStart}ms`);
+
+      const block = msg.content[0];
+      if (!block || block.type !== "text") throw new Error("Claude returned empty/unexpected content");
+
+      const raw = block.text.trim();
+      const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+      const firstBracket = stripped.indexOf("[");
+      const lastBracket = stripped.lastIndexOf("]");
+
+      if (firstBracket !== -1 && lastBracket > firstBracket) {
+        let parsed: unknown[];
+        try {
+          parsed = JSON.parse(stripped.slice(firstBracket, lastBracket + 1)) as unknown[];
+        } catch {
+          parsed = [];
+        }
+
+        for (let i = 0; i < needsLLM.length; i++) {
+          const item = needsLLM[i];
+          const llmResult = parsed[i];
+
+          if (
+            llmResult &&
+            typeof llmResult === "object" &&
+            "category_en" in llmResult &&
+            typeof (llmResult as Record<string, unknown>).category_en === "string"
+          ) {
+            const classified = llmResult as ClassifyResult;
+            results[item.index] = classified;
+            await setCached(item.description, classified, "llm");
+          } else {
+            results[item.index] = FALLBACK;
+          }
+        }
+      } else {
+        needsLLM.forEach((item) => { results[item.index] = FALLBACK; });
       }
-
-      console.log(`[classify] Parsed ${results.length} results — total request time ${Date.now() - batchStart}ms`);
-      return NextResponse.json({ results });
     }
 
-    // 3. Last resort: single object wrapped in array
-    const firstBrace = stripped.indexOf("{");
-    const lastBrace = stripped.lastIndexOf("}");
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      try {
-        const obj = JSON.parse(stripped.slice(firstBrace, lastBrace + 1)) as ClassifyResult;
-        console.warn("[classify] Claude returned single object — wrapping in array");
-        const results = batch.map((_, i) => (i === 0 ? obj : FALLBACK));
-        return NextResponse.json({ results });
-      } catch { /* fall through */ }
-    }
+    // ─── Step 4: 统一返回 ─────────────────────────────────────
+    const finalResults = results.map((r) => r ?? FALLBACK);
+    console.log(`[classify] Done — ${finalResults.length} results returned`);
 
-    console.error("[classify] Could not extract any JSON — returning all fallbacks. Raw:", raw.slice(0, 500));
-    return NextResponse.json({ results: batch.map(() => FALLBACK) });
+    return NextResponse.json({ results: finalResults });
 
   } catch (err) {
     console.error("[classify] Unhandled error:", err);
