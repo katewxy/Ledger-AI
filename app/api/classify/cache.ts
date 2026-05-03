@@ -22,7 +22,7 @@ export async function getCached(description: string): Promise<ClassifyResult | n
     return {
       category_en: data.category_en,
       category_zh: data.category_zh,
-      confidence: data.confidence,
+      confidence: 1.0, //cache hit永远1.0
     };
   } catch {
     return null;
@@ -43,7 +43,7 @@ export async function setCached(
           description: description.trim(),
           category_en: result.category_en,
           category_zh: result.category_zh,
-          confidence: result.confidence,
+          confidence: source === "rule" ? 1.0 : result.confidence,
           source,
         },
         { onConflict: "description" }
